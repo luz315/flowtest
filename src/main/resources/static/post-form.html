@@ -30,19 +30,23 @@
 <button onclick="submitPost()">저장</button>
 
 <script>
+    const BASE_URL = window.location.hostname.includes("localhost")
+        ? "http://localhost:8080"
+        : "https://willing-jania-luz315-77f52ec1.koyeb.app";
+
     const MAX_CUSTOM = 200;
     let customList = [];
 
     window.onload = async function () {
         // 저장된 고정 확장자 체크박스 상태 불러오기
-        const saved = await fetch('/posts/fixed-extensions').then(r => r.json());
+        const saved = await fetch('${BASE_URL}/posts/fixed-extensions').then(r => r.json());
         saved.forEach(val => {
             const input = document.querySelector(`#fixed-container input[value="${val}"]`);
             if (input) input.checked = true;
         });
 
         // 저장된 커스텀 확장자 불러오기
-        const customs = await fetch('/posts/custom-extensions').then(r => r.json());
+        const customs = await fetch('${BASE_URL}/posts/custom-extensions').then(r => r.json());
         customList = customs;
         renderCustomTags();
     }
@@ -83,7 +87,7 @@
     async function removeCustom(index) {
         const value = customList[index];
         try {
-            await fetch(`/posts/custom-extensions/${value}`, { method: 'DELETE' });
+            await fetch(`${BASE_URL}/posts/custom-extensions/${value}`, { method: 'DELETE' });
             customList.splice(index, 1);
             renderCustomTags();
         } catch (e) {
@@ -95,7 +99,7 @@
     document.getElementById("fixed-container").addEventListener("change", async (e) => {
         if (!e.target.value) return;
         const method = e.target.checked ? 'POST' : 'DELETE';
-        await fetch(`/posts/fixed-extensions/${e.target.value}`, { method });
+        await fetch(`${BASE_URL}/posts/fixed-extensions/${e.target.value}`, { method });
     });
 
     async function submitPost() {
@@ -122,7 +126,7 @@
         };
 
         try {
-            const res = await fetch("/posts", {
+            const res = await fetch("${BASE_URL}/posts", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
