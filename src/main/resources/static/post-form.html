@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>게시글 작성</title>
+    <style>
+        .tag { display: inline-block; border: 1px solid black; border-radius: 8px; padding: 5px 10px; margin: 5px; }
+        .tag span { margin-left: 8px; color: red; cursor: pointer; }
+    </style>
+</head>
+<body>
+<h2>고정확장자</h2>
+<div id="fixed-container">
+    <label><input type="checkbox" value="bat">bat</label>
+    <label><input type="checkbox" value="cmd">cmd</label>
+    <label><input type="checkbox" value="com">com</label>
+    <label><input type="checkbox" value="cpl">cpl</label>
+    <label><input type="checkbox" value="exe">exe</label>
+    <label><input type="checkbox" value="scr">scr</label>
+    <label><input type="checkbox" value="js">js</label>
+</div>
+
+<h2>커스텀확장자</h2>
+<input type="text" id="custom-input" placeholder="확장자 입력" maxlength="20"/>
+<button onclick="addCustom()">+추가</button>
+<p><span id="count">0</span>/200</p>
+<div id="custom-tags"></div>
+
+<br/><br/>
+<button onclick="submitPost()">저장</button>
+
+<script>
+    const MAX_CUSTOM = 200;
+    let customList = [];
+
+    window.onload = async function () {
+        // 저장된 고정 확장자 체크박스 상태 불러오기
+        const saved = await fetch('/posts/fixed-extensions').then(r => r.json());
+        saved.forEach(val => {
+            const input = document.querySelector(`#fixed-container input[value="${val}"]`);
+            if (input) input.checked = true;
+        });
+
+        // 저장된 커스텀 확장자 불러오기
+        const customs = await fetch('/posts/custom-extensions').then(r => r.json());
+        customList = customs;
+        renderCustomTags();
+    }
+
+    function renderCustomTags() {
+        const tagContainer = document.getElementById("custom-tags");
+        tagContainer.innerHTML = '';
+        customList.forEach((ext, index) => {
+            const tag = document.createElement("div");
+            tag.className = "tag";
+            tag.innerHTML = `${ext}<span onclick="removeCustom(${index})">x</span>`;
+            tagContainer.appendChild(tag);
+        });
+        document.getElementById("count").textContent = customList.length;
+    }
+
+    async function addCustom() {
+        const input = document.getElementById("custom-input");
+        const value = input.value.trim().toLowerCase(); // 중복 체크를 위해 소문자 고정
+        if (!value) return alert("입력하세요");
+        if (value.length > 20) return alert("20자 이하만 가능합니다");
+
+        // 고정 확장자 중복 확인
+        const fixedSelected = [...document.querySelectorAll("#fixed-container input:checked")].map(i => i.value.toLowerCase());
+        if (fixedSelected.includes(value)) return alert("고정 확장자와 중복됩니다");
+
+        // 커스텀 중복 확인
+        if (customList.includes(value)) return alert("이미 추가된 확장자입니다");
+        if (customList.length >= MAX_CUSTOM) return alert("200개 초과 불가");
+
+        // 👉 서버로 보내지 않고 로컬 상태만 변경
+        customList.push(value);
+        input.value = '';
+        renderCustomTags();
+    }
+
+
+    async function removeCustom(index) {
+        const value = customList[index];
+        try {
+            await fetch(`/posts/custom-extensions/${value}`, { method: 'DELETE' });
+            customList.splice(index, 1);
+            renderCustomTags();
+        } catch (e) {
+            alert("삭제 실패");
+        }
+    }
+
+    // 고정 확장자 변경 시 DB 저장
+    document.getElementById("fixed-container").addEventListener("change", async (e) => {
+        if (!e.target.value) return;
+        const method = e.target.checked ? 'POST' : 'DELETE';
+        await fetch(`/posts/fixed-extensions/${e.target.value}`, { method });
+    });
+
+    async function submitPost() {
+        const fixedTypes = [...document.querySelectorAll("#fixed-container input:checked")].map(i => i.value.toLowerCase());
+
+        // 🔒 최종 중복 검증 (고정 + 커스텀 합쳐서 중복 제거)
+        const combined = [...fixedTypes, ...customList];
+        const unique = new Set(combined);
+        if (unique.size !== combined.length) {
+            alert("고정/커스텀 확장자 간 중복이 있습니다");
+            return;
+        }
+
+        if (combined.length === 0) {
+            alert("최소 하나 이상의 확장자를 선택하거나 입력해야 합니다");
+            return;
+        }
+
+        const payload = {
+            title: "테스트",
+            content: "컨텐츠",
+            checkedTypes: fixedTypes,
+            uploadedExtensions: customList
+        };
+
+        try {
+            const res = await fetch("/posts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || "저장 실패");
+            alert("게시글 생성 성공! ID: " + data.id);
+        } catch (e) {
+            alert("에러 발생: " + e.message);
+        }
+    }
+
+
+</script>
+</body>
+</html>
